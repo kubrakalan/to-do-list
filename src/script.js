@@ -1,82 +1,104 @@
 const inputEl = document.getElementById("input");
-const resultDiv = document.getElementById("result");
+const taskList = document.getElementById("task-list");
 const addBtn = document.getElementById("add");
 const resetBtn = document.getElementById("reset");
+const subtitle = document.getElementById("subtitle");
+const filterBtns = document.querySelectorAll(".filter-btn");
 
-// Görevleri localStorage'dan al
-// Artık her görev bir nesne: { text: "görev metni", completed: false }
-let tasks = JSON.parse(localStorage.getItem("resultDiv")) || [];
+let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+let currentFilter = "all";
 
-// Önceki görevleri yeni formata dönüştür (eski kod için geçiş)
-tasks = tasks.map((task) =>
-  typeof task === "string" ? { text: task, completed: false } : task
-);
-
-// Görevleri ekrana yazdır
-function renderTasks() {
-  resultDiv.innerHTML = `<h2 id="h2-header">LİST</h2>`;
-  tasks.forEach((task, index) => {
-    resultDiv.innerHTML += `
-      <p class="task-item ${task.completed ? "completed" : ""}">
-        <input type="checkbox" class="task-checkbox" data-index="${index}" ${
-      task.completed ? "checked" : ""
-    }>
-        <span class="task-text">${task.text}</span>
-        <button class="delete-btn" data-index="${index}">🗑️</button>
-      </p>`;
-  });
-}
-renderTasks();
-
-// Görevleri localStorage'a kaydet
 function saveTasks() {
-  localStorage.setItem("resultDiv", JSON.stringify(tasks));
+  localStorage.setItem("tasks", JSON.stringify(tasks));
 }
 
-// Yeni görev ekleme
-addBtn.addEventListener("click", () => {
-  const taskText = inputEl.value.trim();
-  if (taskText === "") {
-    alert("Görev giriniz..");
+function updateSubtitle() {
+  const remaining = tasks.filter((t) => !t.completed).length;
+  subtitle.textContent =
+    remaining === 0 ? "Harika, her şey tamam! 🎉" : `${remaining} görev kaldı`;
+}
+
+function getFilteredTasks() {
+  if (currentFilter === "active") return tasks.filter((t) => !t.completed);
+  if (currentFilter === "completed") return tasks.filter((t) => t.completed);
+  return tasks;
+}
+
+function renderTasks() {
+  const filtered = getFilteredTasks();
+  taskList.innerHTML = "";
+
+  if (filtered.length === 0) {
+    taskList.innerHTML = `<li class="empty-state">Henüz görev yok 🎉</li>`;
+    updateSubtitle();
     return;
   }
 
-  // Yeni görev bir nesne olarak eklenir
-  tasks.push({ text: taskText, completed: false });
+  filtered.forEach((task) => {
+    const realIndex = tasks.indexOf(task);
+    const li = document.createElement("li");
+    li.className = `task-item ${task.completed ? "completed" : ""}`;
+    li.innerHTML = `
+      <input type="checkbox" class="task-checkbox" data-index="${realIndex}" ${task.completed ? "checked" : ""}>
+      <span class="task-text">${task.text}</span>
+      <button class="delete-btn" data-index="${realIndex}">✕</button>
+    `;
+    taskList.appendChild(li);
+  });
+
+  updateSubtitle();
+}
+
+function addTask() {
+  const text = inputEl.value.trim();
+  if (!text) {
+    inputEl.focus();
+    inputEl.style.borderColor = "#ff4757";
+    setTimeout(() => (inputEl.style.borderColor = ""), 800);
+    return;
+  }
+  tasks.unshift({ text, completed: false });
   saveTasks();
   renderTasks();
   inputEl.value = "";
-});
+  inputEl.focus();
+}
 
-// Enter tuşu ile görev ekleme
+addBtn.addEventListener("click", addTask);
+
 inputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    addBtn.click();
-  }
+  if (e.key === "Enter") addTask();
 });
 
-// Silme ve tamamlama için delegasyon
-resultDiv.addEventListener("click", (e) => {
-  // Silme butonu
+taskList.addEventListener("click", (e) => {
   if (e.target.classList.contains("delete-btn")) {
-    const index = e.target.dataset.index;
+    const index = +e.target.dataset.index;
     tasks.splice(index, 1);
     saveTasks();
     renderTasks();
   }
 
-  // Checkbox değişikliği
   if (e.target.classList.contains("task-checkbox")) {
-    const index = e.target.dataset.index;
+    const index = +e.target.dataset.index;
     tasks[index].completed = e.target.checked;
     saveTasks();
     renderTasks();
   }
 });
 
-// Reset tüm listeyi temizler
+filterBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    filterBtns.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFilter = btn.dataset.filter;
+    renderTasks();
+  });
+});
+
 resetBtn.addEventListener("click", () => {
-  tasks = [];
-  localStorage.removeItem("resultDiv");
+  tasks = tasks.filter((t) => !t.completed);
+  saveTasks();
   renderTasks();
 });
+
+renderTasks();
